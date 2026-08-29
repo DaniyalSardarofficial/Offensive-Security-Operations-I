@@ -1,0 +1,42 @@
+================================================================
+MARKER FILE EVIDENCE — SHA-256 HASHES, SIZE, TYPE
+Lab 02 — File Upload and Command Execution Security Assessment
+Generated in: ~/lab02_evidence/01_upload_markers/
+================================================================
+
+File:          marker1.txt
+SHA-256:       69d456799c6477801aa53979bf821cbb12da565010ae370e85a9e8de3d22e0a6
+Size:          34 bytes
+Detected type: ASCII text
+Purpose:       Baseline harmless upload marker (expected/normal upload)
+
+File:          marker2_valid.jpg
+SHA-256:       829961027d4a48a5b2e43245f8e3a88e03113766f26f5921083e11155bcfc75b
+Size:          23 bytes
+Detected type: ASCII text
+Purpose:       Baseline harmless upload marker with .jpg extension
+
+File:          marker3_mismatch.jpg
+SHA-256:       883d1b5f7be61d3ff596fbf2d3d86d4fa16075fc6e403e12e041cbcb110ac11d
+Size:          45 bytes
+Detected type: PHP script, ASCII text
+Content:       <?php echo "ICDFA-LAB02-MISMATCH-MARKER"; ?>
+Purpose:       Content/extension mismatch marker — proves absence of
+               server-side content/magic-byte validation
+
+----------------------------------------------------------------
+Generation commands:
+----------------------------------------------------------------
+echo "ICDFA-LAB02-MARKER-TXT-$(date +%s)" > marker1.txt
+echo "ICDFA-LAB02-MARKER-IMG" > marker2_valid.jpg
+echo '<?php echo "ICDFA-LAB02-MISMATCH-MARKER"; ?>' > marker3_mismatch.jpg
+sha256sum marker1.txt marker2_valid.jpg marker3_mismatch.jpg
+file marker1.txt marker2_valid.jpg marker3_mismatch.jpg
+
+----------------------------------------------------------------
+Cleanup verification:
+----------------------------------------------------------------
+All marker files removed from DVWA (/var/www/dvwa/hackable/uploads/) and
+Mutillidae (/tmp/) storage locations after testing. Post-cleanup checks
+confirmed only expected nginx listeners remained on ports 42001/42002,
+with no reverse-shell, netcat, or other unexpected processes running.

