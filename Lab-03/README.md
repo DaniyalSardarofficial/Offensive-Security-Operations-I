@@ -41,7 +41,9 @@ Both applications were tested exclusively inside the isolated lab VM and were ne
   applications' own built-in fictional demo accounts (for SQLi) — no real secrets, credentials, or
   unrelated data were accessed at any point.
 
-Full findings, evidence, analysis, and remediation recommendations are in `lab-03.pdf`.
+Full findings, evidence, analysis, and remediation recommendations are in `lab-03.pdf`. All request/
+response evidence, the marker file hash, and the evidence register are embedded directly in the
+report rather than shipped as separate raw export files.
 
 ## Repository Contents
 
@@ -49,9 +51,6 @@ Full findings, evidence, analysis, and remediation recommendations are in `lab-0
 |---|---|
 | `README.md` | This file |
 | `lab-03.pdf` | Full assessment report — 9-phase evidence walkthrough, analysis questions, remediation table, evidence register, evidence-minimisation statement, and cleanup log |
-| `dvwa_requests.txt` | Exported DVWA HTTP request/response pairs (Burp HTTP history) |
-| `mutillidae_requests.txt` | Exported Mutillidae HTTP request/response pairs (Burp HTTP history) |
-| `marker_hashes.txt` | SHA256 hash of the benign local marker file used to prove LFI |
 
 ## Methodology
 
